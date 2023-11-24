@@ -1,4 +1,4 @@
-# Nondeterministic Turing Machine Simulator
+# Abstract Machine Interpreter
 # By: Carlos Guanzon
 
 
@@ -267,13 +267,24 @@ class NDTM:
         tm = NDTM(start, final)
 
         for line in input.split('\n'):
-            new_line = line.split(' ')
-            state = new_line[0]
+            first_new_line = line.split(' ')
+            state = first_new_line[0]
             state = state.split("]")
             state = state[0]
-            temp_direction = new_line[1]
-            temp_direction = temp_direction[0]
-            new_line = new_line[2:]
+            temp_direction = first_new_line[1]
+            new_line = first_new_line[2:]
+            if(temp_direction != 'RIGHT(T1)' and temp_direction != 'LEFT(T1)'):
+                if(first_new_line[2] == 'RIGHT'):
+                    temp_direction = 'R'
+                    if(first_new_line[2] == 'RIGHT'):
+                        new_line = first_new_line[3:]
+                elif(first_new_line[2] == 'LEFT'):
+                    temp_direction = 'L'
+                    new_line = first_new_line[3:]
+                else:
+                    temp_direction = 'R'
+            else:
+                temp_direction = temp_direction[0]
             stripped_list = map(str.strip, new_line)
             line = ' '.join(stripped_list)
             for transition in line.split(', '):
@@ -284,7 +295,10 @@ class NDTM:
                 temp_symbols = str(fields[0])
                 temp_symbols = temp_symbols.split('/')
                 symbols = tuple(temp_symbols[0])
-                temp_moves = [temp_symbols[1], temp_direction]
+                if(len(temp_symbols) > 1):
+                    temp_moves = [temp_symbols[1], temp_direction]
+                else:
+                    temp_moves = [temp_symbols[0], temp_direction]
                 stripped_list = map(str.strip, temp_moves)
                 temp_moves = ' '.join(stripped_list)
                 temp_moves = [temp_moves]
