@@ -25,10 +25,11 @@ stack_2 = []
 
 class Stack:
 
-    def __init__(self, blank, string='', head=0):
+    def __init__(self, blank, string='', head=0, name = ''):
         global curr_head
         self.blank = blank
         self.loadString(string, head)
+        self.name = name
 
 
 
@@ -160,34 +161,29 @@ class Tape:
 
 class AMI:
 
-    def __init__(self, start, final, stack1_name = 'S1', stack2_name = 'S2', blank='#', ntapes=1, stacks=1, stacks2=1):
+    def __init__(self, start, final, stack1_name = ['S1'], blank='#', ntapes=1, stacks=1):
         self.start = self.state = start
         self.final = final
         self.tapes = [Tape(blank) for _ in range(ntapes)]
         self.trans = defaultdict(list)
         self.transKey = defaultdict(list)
         self.transKeyStack = defaultdict(list)
-        self.stacks = [Stack('`') for _ in range(stacks)]
-        self.stacks2 = [Stack('`') for _ in range(stacks2)]
+        self.stacks = [Stack('`', name= stack1_name[idx]) for idx, _ in enumerate(range(stacks))]
         self.lastPosScan = 'R'
         self.lastPosWrite = 'W'
-        self.stack1_name = stack1_name
-        self.stack2_name = stack2_name
 
 
     def restart(self, string):
         self.state = self.start
         self.tapes[0].loadString(string, 0)
-        self.stacks[0].loadString('', 0)
-        self.stacks2[0].loadString('', 0)
+        if len(self.stacks) != 0:
+            self.stacks[0].loadString('', 0)
         for tape in self.tapes[1:]:
             tape.loadString('', 0)
 
         for stack in self.stacks[1:]:
             stack.loadString('', 0)
 
-        for stack in self.stacks2[1:]:
-            stack.loadString('', 0)
 
     def addTransKey(self, state, read_sym, new_state, moves):
         self.transKey[state].append(moves[0][1])
@@ -212,18 +208,15 @@ class AMI:
         temp_var = self.transKey[self.state]
         if(len(temp_var) > 0):
             if(temp_var[0].split('_')[0] == 'W' or temp_var[0].split('_')[0] == 'Read'):
-                if(temp_var[0].split('_')[1] == self.stack1_name):
-                    key = (self.state, self.readStack())
-                    if key in self.trans:
-                        return self.trans[key]
-                    else:
-                        return None
-                else:
-                    key = (self.state, self.readStack2())
-                    if key in self.trans:
-                        return self.trans[key]
-                    else:
-                        return None
+                for stack in self.stacks:
+                    if(temp_var[0].split('_')[1] == stack.name):
+                        key = (self.state, tuple(stack.readSymbol()))
+                        print('key: ', key)
+                        print('self.trans: ', self.trans)
+                        if key in self.trans:
+                            return self.trans[key]
+
+                return None
             else:
                 key = (self.state, self.readSymbols())
                 print(self.trans)
@@ -259,8 +252,8 @@ class AMI:
 
         self.state, moves = trans
 
-
-        for tape, move, stack, stack2 in zip(self.tapes, moves, self.stacks, self.stacks2):
+        print('this is number of stacks: ', self.stacks)
+        for tape, move, stack in zip(self.tapes, moves, self.stacks):
             symbol, direction = move
 
             temp_var = self.transKey[self.state]
@@ -272,6 +265,8 @@ class AMI:
             print('this is move: ', tape)
             print('this is tapes: ', self.tapes)
             print('tape size: ', len(self.tapes))
+
+            print('stack name: ', stack.name.split)
 
 
 
@@ -293,60 +288,59 @@ class AMI:
                     tape.writeSymbol(symbol)
                     tape.moveHead(direction)
 
-                    if (temp_var[0].split('_')[0] == 'Read' and self.lastPosWrite.split('_')[0] == 'W' and temp_stack_name == self.lastPosWrite.split('_')[1]):
-                        if temp_var[0].split('_')[1] == self.stack1_name:
-                            stack.moveHead('Read')
-                        elif temp_var[0].split('_')[1] == self.stack2_name:
-                            stack2.moveHead('Read')
-                        self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
-                    elif (temp_var[0].split('_')[0] == 'W' and self.lastPosWrite.split('_')[0] == 'Read' and temp_stack_name == self.lastPosWrite.split('_')[1]):
-                        if temp_var[0].split('_')[1] == self.stack1_name:
-                            stack.moveHead('W')
-                        elif temp_var[0].split('_')[1] == self.stack2_name:
-                            stack2.moveHead('W')
-                        self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
-                else:
-                    if (temp_var[0].split('_')[0] == 'Read' and direction.split('_')[0] == 'W' and temp_stack_name == direction.split('_')[1]):
-                        if temp_var[0].split('_')[1] == self.stack1_name:
-                            stack.writeSymbol(symbol)
-                            stack.moveHead('Read')
-                        elif temp_var[0].split('_')[1] == self.stack2_name:
-                            stack2.writeSymbol(symbol)
-                            stack2.moveHead('Read')
-                        self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
-                    elif (temp_var[0].split('_')[0] == 'W' and direction.split('_')[0] == 'Read' and temp_stack_name == direction.split('_')[1]):
-                        if temp_var[0].split('_')[1] == self.stack1_name:
-                            stack.writeSymbol(symbol)
-                            stack.moveHead('W')
-                        elif temp_var[0].split('_')[1] == self.stack2_name:
-                            stack2.writeSymbol(symbol)
-                            stack2.moveHead('W')
-                        self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
-                    elif (direction.split('_')[0] == 'Read' or direction.split('_')[0] == 'W'):
-                        if direction.split('_')[1] == self.stack1_name:
-                            stack.writeSymbol(symbol)
-                            stack.moveHead(direction.split('_')[0])
-                        elif direction.split('_')[1] == self.stack2_name:
-                            stack2.writeSymbol(symbol)
-                            stack2.moveHead(direction.split('_')[0])
-                        self.lastPosWrite = direction
+                    if ((temp_var[0].split('_')[0] == 'Read' and self.lastPosWrite.split('_')[0] == 'W' and temp_stack_name == self.lastPosWrite.split('_')[1])):
 
-                        if (temp_var[0] == 'R' and self.lastPosScan == 'L'):
-                            tape.moveHead('R')
-                            self.lastPosScan = 'R'
-                        elif (temp_var[0] == 'L' and self.lastPosScan == 'R'):
-                            tape.moveHead('L')
-                            self.lastPosScan = 'L'
-                    else:
-                        stack.writeSymbol(symbol)
-                        stack.moveHead(direction.split('_')[0])
-                        self.lastPosWrite = direction
+                        for temp_stack in self.stacks:
+                            print('i am triggering: ', temp_stack)
+                            if temp_stack.name == temp_stack_name:
+                                temp_stack.moveHead('Read')
+
+                                self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
+                    elif ((temp_var[0].split('_')[0] == 'W' and self.lastPosWrite.split('_')[0] == 'Read' and temp_stack_name == self.lastPosWrite.split('_')[1])):
+                        for temp_stack in self.stacks:
+                            print('i am triggering: ', temp_stack)
+                            if temp_stack.name == temp_stack_name:
+                                temp_stack.moveHead('W')
+                                self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
+                else:
+                    if ((temp_var[0].split('_')[0] == 'Read' and direction.split('_')[0] == 'W' and temp_stack_name == direction.split('_')[1])):
+                        for temp_stack in self.stacks:
+                            print('i am triggering: ', temp_stack)
+                            if temp_var[0].split('_')[1] == temp_stack.name:
+                                temp_stack.writeSymbol(symbol)
+                                temp_stack.moveHead('Read')
+                                self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
+                    elif ((temp_var[0].split('_')[0] == 'W' and direction.split('_')[0] == 'Read' and temp_stack_name == direction.split('_')[1])):
+                        for temp_stack in self.stacks:
+                            print('i am triggering: ', temp_stack)
+                            if temp_var[0].split('_')[1] == temp_stack.name:
+                                temp_stack.writeSymbol(symbol)
+                                temp_stack.moveHead('W')
+                                self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
+                    elif ((direction.split('_')[0] == 'Read' or direction.split('_')[0] == 'W') ):
+                        for temp_stack in self.stacks:
+                            print('i am triggering: ', temp_stack)
+                            if direction.split('_')[1] == temp_stack.name:
+                                temp_stack.writeSymbol(symbol)
+                                temp_stack.moveHead(direction.split('_')[0])
+                                self.lastPosWrite = direction
+
+                            if (temp_var[0] == 'R' and self.lastPosScan == 'L'):
+                                tape.moveHead('R')
+                                self.lastPosScan = 'R'
+                            elif (temp_var[0] == 'L' and self.lastPosScan == 'R'):
+                                tape.moveHead('L')
+                                self.lastPosScan = 'L'
 
             else:
+
                 if (direction.split('_')[0] == 'Read' or direction.split('_')[0] == 'W'):
-                    stack.writeSymbol(symbol)
-                    stack.moveHead(direction.split('_')[0])
-                    self.lastPosWrite = direction
+                    for temp_stack in self.stacks:
+
+                        if direction.split('_')[1] == temp_stack.name:
+                            temp_stack.writeSymbol(symbol)
+                            temp_stack.moveHead(direction.split('_')[0])
+                            self.lastPosWrite = direction
                 else:
                     tape.writeSymbol(symbol)
                     tape.moveHead(direction)
@@ -355,8 +349,9 @@ class AMI:
             print('curr state: ', )
             print('move: ', moves[0][1])
             print('tape: ', tape)
-            print('stack: ', stack)
-            print('stack2: ', stack2)
+
+            for temp_stack in self.stacks:
+                print('stack name: ', temp_stack.name, 'stack content: ', temp_stack)
             print('-------------------------')
 
 
@@ -446,8 +441,7 @@ class AMI:
     def parse(input):
         global final_state
         tm = None
-        name_stack1 = ''
-        name_stack2 = ''
+        name_stack1 = []
         line = input.split('\n')
         start = ''
         i = 0
@@ -469,18 +463,18 @@ class AMI:
                 if spec == '.DATA': continue
                 first_new_line = line.split(' ')
                 if first_new_line[0] == 'STACK':
-                    if name_stack1 == '':
-                        name_stack1 = first_new_line[1]
-                    else:
-                        name_stack2 = first_new_line[1]
+                    name_stack1.append(first_new_line[1])
 
 
+        print('nameStack: ', name_stack1)
 
+        if name_stack1 == []:
+            name_stack1.append('')
         start = start.split("] ")
         start = str(start[0])
         final = "accept"
         final_state = final
-        tm = AMI(start, final, stack1_name=name_stack1, stack2_name=name_stack2)
+        tm = AMI(start, final, stack1_name=name_stack1, stacks=len(name_stack1))
         program_state = 'LOGIC'
 
         for line in input.split('\n'):
