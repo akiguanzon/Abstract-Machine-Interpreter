@@ -119,8 +119,7 @@ class Tape:
     def writeSymbol(self, symbol):
 
         if self.head < len(self.symbols):
-            if (self.head == len(self.symbols) - 1):
-                self.symbols.append(symbol)
+
             self.symbols[self.head] = symbol
 
         else:
@@ -159,9 +158,9 @@ class Tape:
                str(self.symbols[self.head:])
 
 
-class NDTM:
+class AMI:
 
-    def __init__(self, start, final, blank='#', ntapes=1, stacks=1):
+    def __init__(self, start, final, stack1_name = 'S1', stack2_name = 'S2', blank='#', ntapes=1, stacks=1, stacks2=1):
         self.start = self.state = start
         self.final = final
         self.tapes = [Tape(blank) for _ in range(ntapes)]
@@ -169,18 +168,25 @@ class NDTM:
         self.transKey = defaultdict(list)
         self.transKeyStack = defaultdict(list)
         self.stacks = [Stack('`') for _ in range(stacks)]
+        self.stacks2 = [Stack('`') for _ in range(stacks2)]
         self.lastPosScan = 'R'
         self.lastPosWrite = 'W'
+        self.stack1_name = stack1_name
+        self.stack2_name = stack2_name
 
 
     def restart(self, string):
         self.state = self.start
         self.tapes[0].loadString(string, 0)
         self.stacks[0].loadString('', 0)
+        self.stacks2[0].loadString('', 0)
         for tape in self.tapes[1:]:
             tape.loadString('', 0)
 
         for stack in self.stacks[1:]:
+            stack.loadString('', 0)
+
+        for stack in self.stacks2[1:]:
             stack.loadString('', 0)
 
     def addTransKey(self, state, read_sym, new_state, moves):
@@ -195,21 +201,29 @@ class NDTM:
     def readStack(self):
         return tuple(stack.readSymbol() for stack in self.stacks)
 
+    def readStack2(self):
+        return tuple(stack.readSymbol() for stack in self.stacks2)
+
     def addTrans(self, state, read_sym, new_state, moves):
         self.trans[(state, read_sym)].append((new_state, moves))
 
 
     def getTrans(self):
         temp_var = self.transKey[self.state]
-        print(self.transKey)
-        print('tempvar: ', temp_var)
         if(len(temp_var) > 0):
-            if(temp_var[0] == 'W' or temp_var[0] == 'Read'):
-                key = (self.state, self.readStack())
-                if key in self.trans:
-                    return self.trans[key]
+            if(temp_var[0].split('_')[0] == 'W' or temp_var[0].split('_')[0] == 'Read'):
+                if(temp_var[0].split('_')[1] == self.stack1_name):
+                    key = (self.state, self.readStack())
+                    if key in self.trans:
+                        return self.trans[key]
+                    else:
+                        return None
                 else:
-                    return None
+                    key = (self.state, self.readStack2())
+                    if key in self.trans:
+                        return self.trans[key]
+                    else:
+                        return None
             else:
                 key = (self.state, self.readSymbols())
                 print(self.trans)
@@ -246,44 +260,75 @@ class NDTM:
         self.state, moves = trans
 
 
-        for tape, move, stack in zip(self.tapes, moves, self.stacks):
+        for tape, move, stack, stack2 in zip(self.tapes, moves, self.stacks, self.stacks2):
             symbol, direction = move
 
             temp_var = self.transKey[self.state]
 
             temp_var_stack = self.transKeyStack[self.state]
 
-            print('tempvar: ', temp_var_stack)
+            temp_stack_name = 'None'
+
+            print('this is move: ', tape)
+            print('this is tapes: ', self.tapes)
+            print('tape size: ', len(self.tapes))
+
+
 
             if (len(temp_var) != 0):
-                if (moves[0][1] == 'R' and temp_var[0] == 'L'):
+                print('Direction: ', direction)
+                print('DIrection concatenated: ', direction.split('_')[0])
+                if temp_var[0].split('_')[0] == 'Read' or temp_var[0].split('_')[0] == 'W':
+                    temp_stack_name = temp_var[0].split('_')[1]
+                else:
+                    temp_stack_name = 'None'
+
+                if (direction == 'R' and temp_var[0] == 'L'):
                     tape.writeSymbol(symbol)
                     tape.moveHead('L')
-                elif (moves[0][1] == 'L' and temp_var[0] == 'R'):
+                elif (direction == 'L' and temp_var[0] == 'R'):
                     tape.writeSymbol(symbol)
                     tape.moveHead('R')
-                elif (moves[0][1] == 'L' or moves[0][1] == 'R'):
+                elif (direction == 'L' or direction == 'R'):
                     tape.writeSymbol(symbol)
                     tape.moveHead(direction)
 
-                    if (temp_var[0] == 'Read' and self.lastPosWrite == 'W'):
-                        stack.moveHead('Read')
-                        self.lastPosWrite = 'Read'
-                    elif (temp_var[0] == 'W' and self.lastPosWrite == 'Read'):
-                        stack.moveHead('W')
-                        self.lastPosWrite = 'W'
+                    if (temp_var[0].split('_')[0] == 'Read' and self.lastPosWrite.split('_')[0] == 'W' and temp_stack_name == self.lastPosWrite.split('_')[1]):
+                        if temp_var[0].split('_')[1] == self.stack1_name:
+                            stack.moveHead('Read')
+                        elif temp_var[0].split('_')[1] == self.stack2_name:
+                            stack2.moveHead('Read')
+                        self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
+                    elif (temp_var[0].split('_')[0] == 'W' and self.lastPosWrite.split('_')[0] == 'Read' and temp_stack_name == self.lastPosWrite.split('_')[1]):
+                        if temp_var[0].split('_')[1] == self.stack1_name:
+                            stack.moveHead('W')
+                        elif temp_var[0].split('_')[1] == self.stack2_name:
+                            stack2.moveHead('W')
+                        self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
                 else:
-                    if (temp_var[0] == 'Read' and moves[0][1] == 'W'):
-                        stack.writeSymbol(symbol)
-                        stack.moveHead('Read')
-                        self.lastPosWrite = 'Read'
-                    elif (temp_var[0] == 'W' and moves[0][1] == 'Read'):
-                        stack.writeSymbol(symbol)
-                        stack.moveHead('W')
-                        self.lastPosWrite = 'W'
-                    elif (moves[0][1] == 'Read' or moves[0][1] == 'W'):
-                        stack.writeSymbol(symbol)
-                        stack.moveHead(direction)
+                    if (temp_var[0].split('_')[0] == 'Read' and direction.split('_')[0] == 'W' and temp_stack_name == direction.split('_')[1]):
+                        if temp_var[0].split('_')[1] == self.stack1_name:
+                            stack.writeSymbol(symbol)
+                            stack.moveHead('Read')
+                        elif temp_var[0].split('_')[1] == self.stack2_name:
+                            stack2.writeSymbol(symbol)
+                            stack2.moveHead('Read')
+                        self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
+                    elif (temp_var[0].split('_')[0] == 'W' and direction.split('_')[0] == 'Read' and temp_stack_name == direction.split('_')[1]):
+                        if temp_var[0].split('_')[1] == self.stack1_name:
+                            stack.writeSymbol(symbol)
+                            stack.moveHead('W')
+                        elif temp_var[0].split('_')[1] == self.stack2_name:
+                            stack2.writeSymbol(symbol)
+                            stack2.moveHead('W')
+                        self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
+                    elif (direction.split('_')[0] == 'Read' or direction.split('_')[0] == 'W'):
+                        if direction.split('_')[1] == self.stack1_name:
+                            stack.writeSymbol(symbol)
+                            stack.moveHead(direction.split('_')[0])
+                        elif direction.split('_')[1] == self.stack2_name:
+                            stack2.writeSymbol(symbol)
+                            stack2.moveHead(direction.split('_')[0])
                         self.lastPosWrite = direction
 
                         if (temp_var[0] == 'R' and self.lastPosScan == 'L'):
@@ -294,22 +339,25 @@ class NDTM:
                             self.lastPosScan = 'L'
                     else:
                         stack.writeSymbol(symbol)
-                        stack.moveHead(direction)
+                        stack.moveHead(direction.split('_')[0])
                         self.lastPosWrite = direction
 
             else:
-                if (moves[0][1] == 'Read' or moves[0][1] == 'W'):
+                if (direction.split('_')[0] == 'Read' or direction.split('_')[0] == 'W'):
                     stack.writeSymbol(symbol)
-                    stack.moveHead(direction)
+                    stack.moveHead(direction.split('_')[0])
                     self.lastPosWrite = direction
                 else:
                     tape.writeSymbol(symbol)
                     tape.moveHead(direction)
 
+
+            print('curr state: ', )
             print('move: ', moves[0][1])
             print('tape: ', tape)
             print('stack: ', stack)
-            print('-------------')
+            print('stack2: ', stack2)
+            print('-------------------------')
 
 
 
@@ -347,7 +395,7 @@ class NDTM:
         return self
 
     def clone(self):
-        tm = NDTM(self.start, self.final)
+        tm = AMI(self.start, self.final)
         tm.state = self.state
         tm.tapes = [tape.clone() for tape in self.tapes]
         tm.stacks = [stack.clone() for stack in self.stacks]
@@ -398,67 +446,115 @@ class NDTM:
     def parse(input):
         global final_state
         tm = None
+        name_stack1 = ''
+        name_stack2 = ''
         line = input.split('\n')
-        line = str(line[0])
-        start = line.split("] ")
+        start = ''
+        i = 0
+        program_state = 'LOGIC'
+
+        while start == '':
+            if line[i] == '.LOGIC':
+                start = str(line[i + 1])
+            i += 1
+
+        for line in input.split('\n'):
+            spec = line.strip()
+            if len(spec) == 0 or spec[0] == '%': continue
+
+            if spec == '.DATA':
+                program_state = 'DATA'
+
+            if program_state == 'DATA':
+                if spec == '.DATA': continue
+                first_new_line = line.split(' ')
+                if first_new_line[0] == 'STACK':
+                    if name_stack1 == '':
+                        name_stack1 = first_new_line[1]
+                    else:
+                        name_stack2 = first_new_line[1]
+
+
+
+        start = start.split("] ")
         start = str(start[0])
         final = "accept"
         final_state = final
-        tm = NDTM(start, final)
+        tm = AMI(start, final, stack1_name=name_stack1, stack2_name=name_stack2)
+        program_state = 'LOGIC'
 
         for line in input.split('\n'):
-            first_new_line = line.split(' ')
-            state = first_new_line[0]
-            state = state.split("]")
-            state = state[0]
-            temp_direction = first_new_line[1]
-            new_line = first_new_line[2:]
-            # Take Command
-            if(temp_direction != 'RIGHT(T1)' and temp_direction != 'LEFT(T1)'):
-                if(first_new_line[2] == 'RIGHT'):
-                    temp_direction = 'R'
-                    if(first_new_line[2] == 'RIGHT'):
-                        new_line = first_new_line[3:]
-                elif(first_new_line[2] == 'LEFT'):
-                    temp_direction = 'L'
-                    new_line = first_new_line[3:]
-                elif (temp_direction.split('(')[0] == 'WRITE'):
-                    print('i am in writing')
-                    temp_direction = 'W'
-                elif (temp_direction.split('(')[0] == 'READ'):
-                    temp_direction = 'Read'
-                else:
-                    temp_direction = 'R'
-            else:
-                temp_direction = temp_direction[0]
+            spec = line.strip()
+            if len(spec) == 0 or spec[0] == '%': continue
 
-            stripped_list = map(str.strip, new_line)
-            line = ' '.join(stripped_list)
-            for transition in line.split(', '):
-                transition = transition.replace("(", "")
-                transition = transition.replace(")", "")
-                fields = transition.split(',')
-                new_st = fields[1]
-                temp_symbols = str(fields[0])
-                temp_symbols = temp_symbols.split('/')
-                symbols = tuple(temp_symbols[0])
-                if(len(temp_symbols) > 1):
-                    temp_moves = [temp_symbols[1], temp_direction]
-                elif(temp_direction == 'W'):
-                    symbols = tuple('`')
-                    temp_moves = [temp_symbols[0], temp_direction]
-                elif(temp_direction == 'Read'):
-                    temp_moves = ['`', temp_direction]
+            print('spec: ', spec)
+
+            if spec == '.DATA':
+                program_state = 'DATA'
+            elif spec == '.LOGIC':
+                program_state = 'LOGIC'
+
+            if program_state == 'DATA':
+                print("I am in data")
+            elif program_state == 'LOGIC':
+                if spec == '.LOGIC': continue
+                first_new_line = line.split(' ')
+                state = first_new_line[0]
+                state = state.split("]")
+                state = state[0]
+                temp_direction = first_new_line[1]
+                new_line = first_new_line[2:]
+                # Take Command
+                if(temp_direction != 'RIGHT(T1)' and temp_direction != 'LEFT(T1)'):
+                    if(first_new_line[2] == 'RIGHT'):
+                        temp_direction = 'R'
+                        if(first_new_line[2] == 'RIGHT'):
+                            new_line = first_new_line[3:]
+                    elif(first_new_line[2] == 'LEFT'):
+                        temp_direction = 'L'
+                        new_line = first_new_line[3:]
+                    elif (temp_direction.split('(')[0] == 'WRITE'):
+                        temp_stack = temp_direction.split('(')[1]
+                        temp_stack = temp_stack.split(')')[0]
+                        temp_direction = 'W'
+                    elif (temp_direction.split('(')[0] == 'READ'):
+                        temp_stack = temp_direction.split('(')[1]
+                        temp_stack = temp_stack.split(')')[0]
+                        temp_direction = 'Read'
+                    else:
+                        temp_direction = 'R'
                 else:
-                    temp_moves = [temp_symbols[0], temp_direction]
-                stripped_list = map(str.strip, temp_moves)
-                temp_moves = ' '.join(stripped_list)
-                temp_moves = [temp_moves]
-                moves = tuple(tuple(m.split(' ')for m in temp_moves))
-                tm.addTrans(state, symbols, new_st, moves)
-                tm.addTransKey(state, symbols, new_st, moves)
-                if(temp_direction == 'Read' or temp_direction == 'W'):
-                    tm.addStackKey(state, symbols, new_st, moves)
+                    temp_direction = temp_direction[0]
+
+                stripped_list = map(str.strip, new_line)
+                line = ' '.join(stripped_list)
+                for transition in line.split(', '):
+                    transition = transition.replace("(", "")
+                    transition = transition.replace(")", "")
+                    fields = transition.split(',')
+                    new_st = fields[1]
+                    temp_symbols = str(fields[0])
+                    temp_symbols = temp_symbols.split('/')
+                    symbols = tuple(temp_symbols[0])
+                    if(len(temp_symbols) > 1):
+                        temp_moves = [temp_symbols[1], temp_direction]
+                    elif(temp_direction == 'W'):
+                        symbols = tuple('`')
+                        temp_direction = temp_direction + '_' + temp_stack
+                        temp_moves = [temp_symbols[0], temp_direction]
+                    elif(temp_direction == 'Read'):
+                        temp_direction = temp_direction + '_' + temp_stack
+                        temp_moves = ['`', temp_direction]
+                    else:
+                        temp_moves = [temp_symbols[0], temp_direction]
+                    stripped_list = map(str.strip, temp_moves)
+                    temp_moves = ' '.join(stripped_list)
+                    temp_moves = [temp_moves]
+                    moves = tuple(tuple(m.split(' ')for m in temp_moves))
+                    tm.addTrans(state, symbols, new_st, moves)
+                    tm.addTransKey(state, symbols, new_st, moves)
+                    if(temp_direction == 'Read' or temp_direction == 'W'):
+                        tm.addStackKey(state, symbols, new_st, moves)
 
         return tm
 
@@ -469,7 +565,7 @@ def display_text():
 
         num_inp = input_text.get("1.0",'end-1c')
 
-        tm = NDTM.parse(machine_definition)
+        tm = AMI.parse(machine_definition)
         acc_tm = tm.accepts(num_inp)
 
 
