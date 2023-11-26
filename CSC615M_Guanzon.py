@@ -11,6 +11,7 @@ output_gui = []
 output_gui_stacks = []
 output_head_list = []
 turn_num = 0
+turn_num_stack = 0
 curr_head = 0
 branch_num = 0
 branch_counter = 0
@@ -21,6 +22,9 @@ machine_definition = "q0] R (1/1,q0), (0/#,q0), (#/#,accept)"
 curr_direction = "right"
 stack_1 = []
 stack_2 = []
+curr_print_stack = []
+print_stack = []
+number_of_stacks = 0
 
 
 class Stack:
@@ -37,7 +41,7 @@ class Stack:
         global branch_num, output_gui_stacks
 
         self.symbols = list(string)
-        self.symbols.append('`')
+        self.symbols.append(' ')
         self.head = head
 
         if self.symbols != []:
@@ -105,6 +109,8 @@ class Tape:
         if self.symbols != []:
             output_gui.append([])
             output_head_list.append([])
+            print_stack.append([])
+            stack_1.append([])
 
             branch_num += 1
 
@@ -168,7 +174,7 @@ class AMI:
         self.trans = defaultdict(list)
         self.transKey = defaultdict(list)
         self.transKeyStack = defaultdict(list)
-        self.stacks = [Stack('`', name= stack1_name[idx]) for idx, _ in enumerate(range(stacks))]
+        self.stacks = [Stack(' ', name= stack1_name[idx]) for idx, _ in enumerate(range(stacks))]
         self.lastPosScan = 'R'
         self.lastPosWrite = 'W'
 
@@ -206,6 +212,7 @@ class AMI:
 
     def getTrans(self):
         temp_var = self.transKey[self.state]
+
         if(len(temp_var) > 0):
             if(temp_var[0].split('_')[0] == 'W' or temp_var[0].split('_')[0] == 'Read'):
                 for stack in self.stacks:
@@ -217,6 +224,9 @@ class AMI:
                             return self.trans[key]
 
                 return None
+            elif temp_var[0] == 'Print':
+                key = (self.state, tuple('#'))
+                return self.trans[key]
             else:
                 key = (self.state, self.readSymbols())
                 print(self.trans)
@@ -228,7 +238,7 @@ class AMI:
             return None
 
     def execTrans(self, trans):
-        global curr_head, branch_counter, curr_direction
+        global curr_head, branch_counter, curr_direction, print_stack
         output_tape = str(self)
         output_tape = output_tape.replace('[', '')
         output_tape = output_tape.replace(']', '')
@@ -250,24 +260,33 @@ class AMI:
             output_gui[branch_counter].append(output_tape)
             output_head_list[branch_counter].append(output_head)
 
+            stripped_list = map(str.strip, curr_print_stack)
+            temp_string = ''.join(stripped_list)
+
+            print_stack[branch_counter].append(temp_string)
+
+
+            for idx, temp_stack in enumerate(self.stacks):
+                stack_string = str(temp_stack)
+                stack_string = stack_string.replace('[', '')
+                stack_string = stack_string.replace(']', '')
+                stack_string = stack_string.replace("'", '')
+                stack_string = stack_string.replace(',', '')
+
+                stack_string = stack_string.replace('\n', '')
+                stack_string = stack_string.replace(' ', '')
+
+                stack_1[branch_counter].append(str(stack_string))
+
+
         self.state, moves = trans
 
-        print('this is number of stacks: ', self.stacks)
         for tape, move, stack in zip(self.tapes, moves, self.stacks):
             symbol, direction = move
 
             temp_var = self.transKey[self.state]
 
-            temp_var_stack = self.transKeyStack[self.state]
-
             temp_stack_name = 'None'
-
-            print('this is move: ', tape)
-            print('this is tapes: ', self.tapes)
-            print('tape size: ', len(self.tapes))
-
-            print('stack name: ', stack.name.split)
-
 
 
             if (len(temp_var) != 0):
@@ -278,7 +297,11 @@ class AMI:
                 else:
                     temp_stack_name = 'None'
 
-                if (direction == 'R' and temp_var[0] == 'L'):
+
+
+                if(direction == 'Print'):
+                    curr_print_stack.append(symbol)
+                elif (direction == 'R' and temp_var[0] == 'L'):
                     tape.writeSymbol(symbol)
                     tape.moveHead('L')
                 elif (direction == 'L' and temp_var[0] == 'R'):
@@ -350,15 +373,7 @@ class AMI:
             print('move: ', moves[0][1])
             print('tape: ', tape)
 
-            for temp_stack in self.stacks:
-                print('stack name: ', temp_stack.name, 'stack content: ', temp_stack)
             print('-------------------------')
-
-
-
-
-
-
 
 
         output_tape = str(self)
@@ -381,7 +396,27 @@ class AMI:
 
             output_gui[branch_counter].append(output_tape)
             output_head_list[branch_counter].append(output_head)
+
+            stripped_list = map(str.strip, curr_print_stack)
+            temp_string = ''.join(stripped_list)
+
+            print_stack[branch_counter].append(temp_string)
+
+            for idx, temp_stack in enumerate(self.stacks):
+                stack_string = str(temp_stack)
+                stack_string = stack_string.replace('[', '')
+                stack_string = stack_string.replace(']', '')
+                stack_string = stack_string.replace("'", '')
+                stack_string = stack_string.replace(',', '')
+
+                stack_string = stack_string.replace('\n', '')
+                stack_string = stack_string.replace(' ', '')
+
+                stack_1[branch_counter].append(str(stack_string))
+
             branch_counter += 1
+
+
 
 
             if branch_counter == branch_num:
@@ -439,7 +474,7 @@ class AMI:
 
     @staticmethod
     def parse(input):
-        global final_state
+        global final_state, number_of_stacks
         tm = None
         name_stack1 = []
         line = input.split('\n')
@@ -465,8 +500,7 @@ class AMI:
                 if first_new_line[0] == 'STACK':
                     name_stack1.append(first_new_line[1])
 
-
-        print('nameStack: ', name_stack1)
+        number_of_stacks = len(name_stack1)
 
         if name_stack1 == []:
             name_stack1.append('')
@@ -474,6 +508,7 @@ class AMI:
         start = str(start[0])
         final = "accept"
         final_state = final
+
         tm = AMI(start, final, stack1_name=name_stack1, stacks=len(name_stack1))
         program_state = 'LOGIC'
 
@@ -515,6 +550,8 @@ class AMI:
                         temp_stack = temp_direction.split('(')[1]
                         temp_stack = temp_stack.split(')')[0]
                         temp_direction = 'Read'
+                    elif (temp_direction == 'PRINT'):
+                        temp_direction = 'Print'
                     else:
                         temp_direction = 'R'
                 else:
@@ -533,19 +570,25 @@ class AMI:
                     if(len(temp_symbols) > 1):
                         temp_moves = [temp_symbols[1], temp_direction]
                     elif(temp_direction == 'W'):
-                        symbols = tuple('`')
+                        symbols = tuple(' ')
                         temp_direction = temp_direction + '_' + temp_stack
                         temp_moves = [temp_symbols[0], temp_direction]
                     elif(temp_direction == 'Read'):
                         temp_direction = temp_direction + '_' + temp_stack
-                        temp_moves = ['`', temp_direction]
+                        temp_moves = [' ', temp_direction]
+                    elif(temp_direction == 'Print'):
+                        symbols = tuple('#')
+                        temp_moves = [temp_symbols[0], temp_direction]
+                        print('this is temp symbols: ', temp_symbols)
                     else:
                         temp_moves = [temp_symbols[0], temp_direction]
                     stripped_list = map(str.strip, temp_moves)
                     temp_moves = ' '.join(stripped_list)
                     temp_moves = [temp_moves]
                     moves = tuple(tuple(m.split(' ')for m in temp_moves))
+
                     tm.addTrans(state, symbols, new_st, moves)
+                    print('this is in read or write: ', state, symbols, new_st, moves)
                     tm.addTransKey(state, symbols, new_st, moves)
                     if(temp_direction == 'Read' or temp_direction == 'W'):
                         tm.addStackKey(state, symbols, new_st, moves)
@@ -609,49 +652,33 @@ def display_text():
                     text="Final String and State = λ" + " (ACCEPTED)",
                     fg="#008000")
         else:
-            branch_counter = 0
-
+            label.config(
+                text="REJECTED",
+                fg="#FF0000")
             reset_btn['state'] = tk.NORMAL
             compute_btn['state'] = tk.DISABLED
-
-            for idx, item in enumerate(output_gui):
-                if item != []:
-
-                    num_of_branches += 1
-                    temp_result = [i for i in item if i.startswith(final_state)]
-                    if temp_result != []:
-                        final_result = temp_result
-                        final_result = str(final_result)
-                        final_result = final_result.replace('[', '')
-                        final_result = final_result.replace(']', '')
-                        final_result = final_result.replace("'", '')
-                        final_result = final_result.replace(',', '')
-
-                        final_result = final_result.replace('\n', '')
-                        final_result = final_result.replace(' ', '')
-                        accepted_branch_num = idx
-
-            if num_of_branches != 0:
-                steps_btn['state'] = tk.NORMAL
-                for item in output_gui[accepted_branch_num]:
-                    list_len += 1
-
-                label.config(text="Final String and State = " + str(final_result) + " (ACCEPTED)", fg="#008000")
-                if branch_num <= 1:
-                    is_last_branch = True
-            else:
-                label.config(
-                    text="Final String and State = λ" + " (ACCEPTED)",
-                    fg="#008000")
 
 
 
 def display_steps():
-        global turn_num, branch_counter
+        global turn_num, branch_counter, turn_num_stack
         list_len = 0
 
+
         head_label.config(text=output_head_list[branch_counter][turn_num])
-        label.config(text=output_gui[branch_counter][turn_num], fg="#000000")
+        label.config(text=output_gui[branch_counter][turn_num] , fg="#000000")
+
+        text = 'Print: ' + print_stack[branch_counter][turn_num]
+
+        if number_of_stacks > 0:
+            text += '\n'
+
+        for j in range(number_of_stacks):
+            text += '\n'
+            text += 'Stack ' + str(j + 1) + ': ' + stack_1[branch_counter][turn_num_stack+j]
+
+
+        instructions_text.config(text=text, fg="#000000")
 
         if is_last_branch == False:
             next_branch_btn['state'] = tk.NORMAL
@@ -662,8 +689,10 @@ def display_steps():
 
         if turn_num > list_len - 3:
             turn_num += 1
+            turn_num_stack += number_of_stacks
         else:
             turn_num += 1
+            turn_num_stack += number_of_stacks
 
         if turn_num == list_len:
             if branch_counter == accepted_branch_num:
@@ -671,12 +700,13 @@ def display_steps():
 
             steps_btn['state'] = tk.DISABLED
             turn_num = 0
+            turn_num_stack = 0
 
 
 
 
 def reset():
-    global turn_num, output_gui, output_head_list, curr_head, branch_counter,branch_num, is_last_branch, final_state, accepted_branch_num
+    global turn_num, output_gui, output_head_list, curr_head, branch_counter,branch_num, is_last_branch, final_state, accepted_branch_num, print_stack, curr_print_stack, stack_1, number_of_stacks
     turn_num = 0
     branch_counter = 0
     branch_num = 0
@@ -693,6 +723,30 @@ def reset():
     compute_btn['state'] = tk.NORMAL
     next_branch_btn['state'] = tk.DISABLED
     accepted_branch_btn['state'] = tk.DISABLED
+    curr_print_stack = []
+    print_stack = []
+    stack_1 = []
+    number_of_stacks = 0
+
+    instructions_text.config(text="INSTRUCTIONS\n\n"
+                                      "<Compute> - Computes your designated input with the machine file you submitted\n"
+                                      "<Next> - Proceeds to the next step of the current configuration branch\n"
+                                      "<Next Branch> - Proceeds to the next computed branch (for nondeterministic machines only)\n"
+                                      "<Accepted Branch> - Skips to the accepted branch (for nondeterministic machines only)\n"
+                                      "<Reset> - Resets the program (Must be pressed first before computing for another machine and/or input)\n\n\n"
+                                      "NOTE: Due to the nondeterministic nature of the machine, there may be multiple accepted branches.\n"
+                                      "This program computes all the branches of the same level in the tree, simultaneously,\n"
+                                      "and stops when a branch/branches in a level have reached an accepting state.\n"
+                                      "It is completely possible to have multiple accepted branches, but for the purpose of this program,\n"
+                                      "only the first branch that gets accepted will appear.\n\n"
+                                      "It is also important to note that the 'Accepted Branch' may only contain a portion of the steps\n"
+                                      "computed to get to the accepted state. This is because it is possible that the 'Accepted Branch'\n"
+                                      "is a sub-branch of another branch, and has diverged from the list of branches of the program,\n"
+                                      "which inevitably excludes the previous steps computed.\n\n"
+                                      "You can test out the program right away by computing without changing the input and\n"
+                                      "without adding a file. There is currently a sample machine stored that removes all 0's\n"
+                                      "of an input string of the language - (0 U 1)*",
+                                 font=("Courier 12"), fg="#6F6F6F")
 
 def next_branch():
     global branch_counter, turn_num, is_last_branch
@@ -704,6 +758,7 @@ def next_branch():
 
     head_label.config(text=output_head_list[branch_counter][turn_num])
     label.config(text=output_gui[branch_counter][turn_num], fg="#000000")
+    instructions_text.config(text=print_stack[branch_counter][turn_num], fg="#000000")
 
     turn_num += 1
 
