@@ -41,7 +41,7 @@ class Stack:
         global branch_num, output_gui_stacks
 
         self.symbols = list(string)
-        self.symbols.append(' ')
+        self.symbols.append('`')
         self.head = head
 
         if self.symbols != []:
@@ -71,7 +71,10 @@ class Stack:
             inc = -1
         else:
             inc = 0
+        print('current pointer head: ', self.head)
         self.head += inc
+        if self.head < 0:
+            self.head = 0
 
 
 
@@ -145,6 +148,7 @@ class Tape:
         else:
             inc = 0
         self.head += inc
+
         curr_head = self.head
 
 
@@ -174,9 +178,9 @@ class AMI:
         self.trans = defaultdict(list)
         self.transKey = defaultdict(list)
         self.transKeyStack = defaultdict(list)
-        self.stacks = [Stack(' ', name= stack1_name[idx]) for idx, _ in enumerate(range(stacks))]
+        self.stacks = [Stack('`', name= stack1_name[idx]) for idx, _ in enumerate(range(stacks))]
         self.lastPosScan = 'R'
-        self.lastPosWrite = 'W'
+        self.lastPosWrite = ''
 
 
     def restart(self, string):
@@ -229,6 +233,7 @@ class AMI:
                 return self.trans[key]
             else:
                 key = (self.state, self.readSymbols())
+                print('i am key: ', key)
                 print(self.trans)
                 if key in self.trans:
                     return self.trans[key]
@@ -281,7 +286,7 @@ class AMI:
 
         self.state, moves = trans
 
-        for tape, move, stack in zip(self.tapes, moves, self.stacks):
+        for tape, move in zip(self.tapes, moves):
             symbol, direction = move
 
             temp_var = self.transKey[self.state]
@@ -304,12 +309,15 @@ class AMI:
                 elif (direction == 'R' and temp_var[0] == 'L'):
                     tape.writeSymbol(symbol)
                     tape.moveHead('L')
+                    self.lastPosScan = 'L'
                 elif (direction == 'L' and temp_var[0] == 'R'):
                     tape.writeSymbol(symbol)
                     tape.moveHead('R')
+                    self.lastPosScan = 'R'
                 elif (direction == 'L' or direction == 'R'):
                     tape.writeSymbol(symbol)
                     tape.moveHead(direction)
+                    self.lastPosScan = direction
 
                     if ((temp_var[0].split('_')[0] == 'Read' and self.lastPosWrite.split('_')[0] == 'W' and temp_stack_name == self.lastPosWrite.split('_')[1])):
 
@@ -317,14 +325,8 @@ class AMI:
                             print('i am triggering: ', temp_stack)
                             if temp_stack.name == temp_stack_name:
                                 temp_stack.moveHead('Read')
-
                                 self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
-                    elif ((temp_var[0].split('_')[0] == 'W' and self.lastPosWrite.split('_')[0] == 'Read' and temp_stack_name == self.lastPosWrite.split('_')[1])):
-                        for temp_stack in self.stacks:
-                            print('i am triggering: ', temp_stack)
-                            if temp_stack.name == temp_stack_name:
-                                temp_stack.moveHead('W')
-                                self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
+
                 else:
                     if ((temp_var[0].split('_')[0] == 'Read' and direction.split('_')[0] == 'W' and temp_stack_name == direction.split('_')[1])):
                         for temp_stack in self.stacks:
@@ -333,13 +335,16 @@ class AMI:
                                 temp_stack.writeSymbol(symbol)
                                 temp_stack.moveHead('Read')
                                 self.lastPosWrite = 'Read' + '_' + temp_var[0].split('_')[1]
-                    elif ((temp_var[0].split('_')[0] == 'W' and direction.split('_')[0] == 'Read' and temp_stack_name == direction.split('_')[1])):
-                        for temp_stack in self.stacks:
-                            print('i am triggering: ', temp_stack)
-                            if temp_var[0].split('_')[1] == temp_stack.name:
-                                temp_stack.writeSymbol(symbol)
-                                temp_stack.moveHead('W')
-                                self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
+
+                        if (temp_var[0] == 'R' and self.lastPosScan == 'L'):
+                            tape.moveHead('R')
+                            tape.moveHead('R')
+                            self.lastPosScan = 'R'
+                        elif (temp_var[0] == 'L' and self.lastPosScan == 'R'):
+                            tape.moveHead('L')
+                            tape.moveHead('L')
+                            self.lastPosScan = 'L'
+
                     elif ((direction.split('_')[0] == 'Read' or direction.split('_')[0] == 'W') ):
                         for temp_stack in self.stacks:
                             print('i am triggering: ', temp_stack)
@@ -348,12 +353,14 @@ class AMI:
                                 temp_stack.moveHead(direction.split('_')[0])
                                 self.lastPosWrite = direction
 
-                            if (temp_var[0] == 'R' and self.lastPosScan == 'L'):
-                                tape.moveHead('R')
-                                self.lastPosScan = 'R'
-                            elif (temp_var[0] == 'L' and self.lastPosScan == 'R'):
-                                tape.moveHead('L')
-                                self.lastPosScan = 'L'
+                        if (temp_var[0] == 'R' and self.lastPosScan == 'L'):
+                            tape.moveHead('R')
+                            tape.moveHead('R')
+                            self.lastPosScan = 'R'
+                        elif (temp_var[0] == 'L' and self.lastPosScan == 'R'):
+                            tape.moveHead('L')
+                            tape.moveHead('L')
+                            self.lastPosScan = 'L'
 
             else:
 
@@ -372,6 +379,9 @@ class AMI:
             print('curr state: ', )
             print('move: ', moves[0][1])
             print('tape: ', tape)
+
+            for idx, stack in enumerate(self.stacks):
+                print("stack ", idx, ": ", stack)
 
             print('-------------------------')
 
@@ -570,12 +580,12 @@ class AMI:
                     if(len(temp_symbols) > 1):
                         temp_moves = [temp_symbols[1], temp_direction]
                     elif(temp_direction == 'W'):
-                        symbols = tuple(' ')
+                        symbols = tuple('`')
                         temp_direction = temp_direction + '_' + temp_stack
                         temp_moves = [temp_symbols[0], temp_direction]
                     elif(temp_direction == 'Read'):
                         temp_direction = temp_direction + '_' + temp_stack
-                        temp_moves = [' ', temp_direction]
+                        temp_moves = ['`', temp_direction]
                     elif(temp_direction == 'Print'):
                         symbols = tuple('#')
                         temp_moves = [temp_symbols[0], temp_direction]
@@ -652,11 +662,44 @@ def display_text():
                     text="Final String and State = λ" + " (ACCEPTED)",
                     fg="#008000")
         else:
-            label.config(
-                text="REJECTED",
-                fg="#FF0000")
+            branch_counter = 0
+
             reset_btn['state'] = tk.NORMAL
             compute_btn['state'] = tk.DISABLED
+
+
+
+            for idx, item in enumerate(output_gui):
+                if item != []:
+
+                    num_of_branches += 1
+                    temp_result = [i for i in item if i.startswith(final_state)]
+                    if temp_result != []:
+                        final_result = temp_result
+                        final_result = str(final_result)
+                        final_result = final_result.replace('[', '')
+                        final_result = final_result.replace(']', '')
+                        final_result = final_result.replace("'", '')
+                        final_result = final_result.replace(',', '')
+
+                        final_result = final_result.replace('\n', '')
+                        final_result = final_result.replace(' ', '')
+                        accepted_branch_num = idx
+
+
+
+            if num_of_branches != 0:
+                steps_btn['state'] = tk.NORMAL
+                for item in output_gui[accepted_branch_num]:
+                    list_len += 1
+
+                label.config(text="Final String and State = "+ str(final_result) + " (ACCEPTED)", fg="#008000")
+                if branch_num <= 1:
+                    is_last_branch = True
+            else:
+                label.config(
+                    text="Final String and State = λ" + " (ACCEPTED)",
+                    fg="#008000")
 
 
 
@@ -706,7 +749,7 @@ def display_steps():
 
 
 def reset():
-    global turn_num, output_gui, output_head_list, curr_head, branch_counter,branch_num, is_last_branch, final_state, accepted_branch_num, print_stack, curr_print_stack, stack_1, number_of_stacks
+    global turn_num, output_gui, output_head_list, curr_head, branch_counter,branch_num, is_last_branch, final_state, accepted_branch_num, print_stack, curr_print_stack, stack_1, number_of_stacks, turn_num_stack
     turn_num = 0
     branch_counter = 0
     branch_num = 0
@@ -727,6 +770,7 @@ def reset():
     print_stack = []
     stack_1 = []
     number_of_stacks = 0
+    turn_num_stack = 0
 
     instructions_text.config(text="INSTRUCTIONS\n\n"
                                       "<Compute> - Computes your designated input with the machine file you submitted\n"
