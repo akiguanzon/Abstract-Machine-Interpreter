@@ -25,6 +25,7 @@ stack_2 = []
 curr_print_stack = []
 print_stack = []
 number_of_stacks = 0
+number_of_tapes = 0
 
 
 class Stack:
@@ -99,11 +100,16 @@ class Stack:
 
 class Tape:
 
-    def __init__(self, blank, string='', head=0):
+    def __init__(self, blank, string='', head=0, name='T1'):
         global curr_head
+        self.lastCommand = ' _ '
         self.blank = blank
         self.loadString(string, head)
+        self.name = name
 
+
+    def changeCommand(self, string):
+        self.lastCommand = string
 
 
     def loadString(self, string, head):
@@ -175,10 +181,10 @@ class Tape:
 
 class AMI:
 
-    def __init__(self, start, final, stack1_name = ['S1'], blank='#', ntapes=1, stacks=1):
+    def __init__(self, start, final, stack1_name = ['S1'], tape_name = ['T1'], blank='#', ntapes=1, stacks=1):
         self.start = self.state = start
         self.final = final
-        self.tapes = [Tape(blank) for _ in range(ntapes)]
+        self.tapes = [Tape(blank, name=tape_name[idx]) for idx, _ in enumerate(range(ntapes))]
         self.trans = defaultdict(list)
         self.transKey = defaultdict(list)
         self.transKeyStack = defaultdict(list)
@@ -237,43 +243,49 @@ class AMI:
                 key = (self.state, tuple('#'))
                 return self.trans[key]
             else:
-                key = (self.state, self.readSymbols())
-                print('i am key: ', key)
-                print(self.trans)
-                if key in self.trans:
-                    return self.trans[key]
-                else:
-                    return None
+                for tape in self.tapes:
+                    if(temp_var[0].split('_')[1] == tape.name):
+                        key = (self.state, tuple(tape.readSymbol()))
+                        print('i am key: ', key)
+                        print(self.trans)
+                        if key in self.trans:
+                            return self.trans[key]
+
+                return None
         else:
             return None
 
     def execTrans(self, trans):
         global curr_head, branch_counter, curr_direction, print_stack
-        output_tape = str(self)
-        output_tape = output_tape.replace('[', '')
-        output_tape = output_tape.replace(']', '')
-        output_tape = output_tape.replace("'", '')
-        output_tape = output_tape.replace(',', '')
 
-        output_tape = output_tape.replace('\n', '')
-        output_tape = output_tape.replace(' ', '')
-        head_num = (len(self.state) + 1) + curr_head
-        output_head = output_tape[0:head_num] + 'V' + output_tape[head_num + 1:]
-
-        for idx, let in enumerate(output_head):
-            if let != 'V':
-                let = ' '
-                output_head = output_head[0:idx] + let + output_head[idx + 1: ]
 
         if branch_counter < branch_num:
 
-            output_gui[branch_counter].append(output_tape)
-            output_head_list[branch_counter].append(output_head)
+            for idx, output_tape in enumerate(self.tapes):
+                output_tape = str(output_tape)
+                output_tape = output_tape.replace('[', '')
+                output_tape = output_tape.replace(']', '')
+                output_tape = output_tape.replace("'", '')
+                output_tape = output_tape.replace(',', '')
 
-            stripped_list = map(str.strip, curr_print_stack)
-            temp_string = ''.join(stripped_list)
+                output_tape = output_tape.replace('\n', '')
+                output_tape = output_tape.replace(' ', '')
+                output_tape = str(self.state) + ':' + output_tape
+                head_num = (len(self.state) + 1) + curr_head
+                output_head = output_tape[0:head_num] + 'V' + output_tape[head_num + 1:]
 
-            print_stack[branch_counter].append(temp_string)
+                for i, let in enumerate(output_head):
+                    if let != 'V':
+                        let = ' '
+                        output_head = output_head[0:i] + let + output_head[i + 1:]
+
+                output_gui[branch_counter].append(output_tape)
+                output_head_list[branch_counter].append(output_head)
+
+                stripped_list = map(str.strip, curr_print_stack)
+                temp_string = ''.join(stripped_list)
+
+                print_stack[branch_counter].append(temp_string)
 
 
             for idx, temp_stack in enumerate(self.stacks):
@@ -306,23 +318,39 @@ class AMI:
                     temp_stack_name = temp_var[0].split('_')[1]
                 else:
                     temp_stack_name = 'None'
+                if temp_var[0].split('_')[0] == 'R' or temp_var[0].split('_')[0] == 'L':
+                    temp_tape_name = temp_var[0].split('_')[1]
+                else:
+                    temp_tape_name = 'None'
+
+
 
 
 
                 if(direction == 'Print'):
                     curr_print_stack.append(symbol)
-                elif (direction == 'R' and temp_var[0] == 'L'):
-                    tape.writeSymbol(symbol)
-                    tape.moveHead('L')
-                    self.lastPosScan = 'L'
-                elif (direction == 'L' and temp_var[0] == 'R'):
-                    tape.writeSymbol(symbol)
-                    tape.moveHead('R')
-                    self.lastPosScan = 'R'
-                elif (direction == 'L' or direction == 'R'):
-                    tape.writeSymbol(symbol)
-                    tape.moveHead(direction)
-                    self.lastPosScan = direction
+                elif (direction.split('_')[0] == 'R' and temp_var[0].split('_')[0] == 'L' and temp_tape_name == direction.split('_')[1]):
+
+                    for temp_tape in self.tapes:
+                        if temp_var[0].split('_')[1] == temp_tape.name:
+                            temp_tape.writeSymbol(symbol)
+                            temp_tape.moveHead('L')
+                            self.lastPosScan = 'L'
+                            temp_tape.changeCommand('L' + '_' + temp_var[0].split('_')[1])
+                elif (direction.split('_')[0] == 'L' and temp_var[0].split('_')[0] == 'R' and temp_tape_name == direction.split('_')[1]):
+                    for temp_tape in self.tapes:
+                        if temp_var[0].split('_')[1] == temp_tape.name:
+                            temp_tape.writeSymbol(symbol)
+                            temp_tape.moveHead('R')
+                            self.lastPosScan = 'R'
+                            temp_tape.changeCommand('R' + '_' + temp_var[0].split('_')[1])
+                elif (direction.split('_')[0] == 'L' or direction.split('_')[0] == 'R'):
+                    for temp_tape in self.tapes:
+                        if direction.split('_')[1] == temp_tape.name:
+                            temp_tape.writeSymbol(symbol)
+                            temp_tape.moveHead(direction.split('_')[0])
+                            self.lastPosScan = direction
+                            temp_tape.changeCommand(direction)
 
                 else:
 
@@ -347,15 +375,6 @@ class AMI:
                                 self.lastPosWrite = direction
                                 temp_stack.changeCommand(direction)
 
-                    if (temp_var[0] == 'R' and self.lastPosScan == 'L'):
-                        tape.moveHead('R')
-                        tape.moveHead('R')
-                        self.lastPosScan = 'R'
-                    elif (temp_var[0] == 'L' and self.lastPosScan == 'R'):
-                        tape.moveHead('L')
-                        tape.moveHead('L')
-                        self.lastPosScan = 'L'
-
                 for temp_stack in self.stacks:
 
                     if ((temp_var[0].split('_')[0] == 'Read' and temp_stack.lastCommand.split('_')[0] == 'W' and temp_stack_name == temp_stack.lastCommand.split('_')[1])):
@@ -373,6 +392,24 @@ class AMI:
                             self.lastPosWrite = 'W' + '_' + temp_var[0].split('_')[1]
                             temp_stack.changeCommand('W' + '_' + temp_var[0].split('_')[1])
 
+
+                for temp_tape in self.tapes:
+
+                    if ((temp_var[0].split('_')[0] == 'R' and temp_tape.lastCommand.split('_')[0] == 'L' and temp_tape_name == temp_tape.lastCommand.split('_')[1])):
+
+                            if temp_tape.name == temp_tape_name:
+                                temp_tape.moveHead('R')
+                                temp_tape.moveHead('R')
+                                self.lastPosWrite = 'R' + '_' + temp_var[0].split('_')[1]
+                                temp_tape.changeCommand('R')
+
+                    elif ((temp_var[0].split('_')[0] == 'L' and temp_tape.lastCommand.split('_')[0] == 'R' and temp_tape_name == temp_tape.lastCommand.split('_')[1])):
+
+                        if temp_tape.name == temp_tape_name:
+                            temp_tape.moveHead('L')
+                            temp_tape.moveHead('L')
+                            self.lastPosWrite = 'L' + '_' + temp_var[0].split('_')[1]
+                            temp_tape.changeCommand('L' + '_' + temp_var[0].split('_')[1])
 
 
             else:
@@ -399,31 +436,35 @@ class AMI:
             print('-------------------------')
 
 
-        output_tape = str(self)
-        output_tape = output_tape.replace('[', '')
-        output_tape = output_tape.replace(']', '')
-        output_tape = output_tape.replace("'", '')
-        output_tape = output_tape.replace(',', '')
-
-        output_tape = output_tape.replace('\n', '')
-        output_tape = output_tape.replace(' ', '')
-        head_num = (len(self.state) + 1) + curr_head
-        output_head = output_tape[0:head_num] + 'V' + output_tape[head_num + 1:]
-
-        for idx, let in enumerate(output_head):
-            if let != 'V':
-                let = ' '
-                output_head = output_head[0:idx] + let + output_head[idx + 1:]
 
         if branch_counter < branch_num:
 
-            output_gui[branch_counter].append(output_tape)
-            output_head_list[branch_counter].append(output_head)
+            for idx, output_tape in enumerate(self.tapes):
+                output_tape = str(output_tape)
+                output_tape = output_tape.replace('[', '')
+                output_tape = output_tape.replace(']', '')
+                output_tape = output_tape.replace("'", '')
+                output_tape = output_tape.replace(',', '')
 
-            stripped_list = map(str.strip, curr_print_stack)
-            temp_string = ''.join(stripped_list)
+                output_tape = output_tape.replace('\n', '')
+                output_tape = output_tape.replace(' ', '')
+                output_tape = str(self.state) + ':' + output_tape
+                head_num = (len(self.state) + 1) + curr_head
+                output_head = output_tape[0:head_num] + 'V' + output_tape[head_num + 1:]
 
-            print_stack[branch_counter].append(temp_string)
+                for i, let in enumerate(output_head):
+                    if let != 'V':
+                        let = ' '
+                        output_head = output_head[0:i] + let + output_head[i + 1:]
+
+                output_gui[branch_counter].append(output_tape)
+                output_head_list[branch_counter].append(output_head)
+
+
+                stripped_list = map(str.strip, curr_print_stack)
+                temp_string = ''.join(stripped_list)
+
+                print_stack[branch_counter].append(temp_string)
 
             for idx, temp_stack in enumerate(self.stacks):
                 stack_string = str(temp_stack)
@@ -497,9 +538,10 @@ class AMI:
 
     @staticmethod
     def parse(input):
-        global final_state, number_of_stacks
+        global final_state, number_of_stacks, number_of_tapes
         tm = None
         name_stack1 = []
+        name_tape = []
         line = input.split('\n')
         start = ''
         i = 0
@@ -522,17 +564,24 @@ class AMI:
                 first_new_line = line.split(' ')
                 if first_new_line[0] == 'STACK':
                     name_stack1.append(first_new_line[1])
+                elif first_new_line[0] == 'TAPE':
+                    name_tape.append(first_new_line[1])
 
         number_of_stacks = len(name_stack1)
 
+
         if name_stack1 == []:
             name_stack1.append('')
+        if name_tape == []:
+            name_tape.append('T1')
+
+        number_of_tapes = len(name_tape)
         start = start.split("] ")
         start = str(start[0])
         final = "accept"
         final_state = final
 
-        tm = AMI(start, final, stack1_name=name_stack1, stacks=len(name_stack1))
+        tm = AMI(start, final, stack1_name=name_stack1, tape_name=name_tape, ntapes=number_of_tapes, stacks=len(name_stack1))
         program_state = 'LOGIC'
 
         for line in input.split('\n'):
@@ -557,28 +606,33 @@ class AMI:
                 line_direction = first_new_line[1]
                 new_line = first_new_line[2:]
                 # Take Command
-                if(line_direction != 'RIGHT(T1)' and line_direction != 'LEFT(T1)'):
-                    if(first_new_line[2] == 'RIGHT'):
-                        temp_direction = 'R'
-                        if(first_new_line[2] == 'RIGHT'):
-                            new_line = first_new_line[3:]
-                    elif(first_new_line[2] == 'LEFT'):
-                        temp_direction = 'L'
-                        new_line = first_new_line[3:]
-                    elif (line_direction.split('(')[0] == 'WRITE'):
-                        temp_stack = line_direction.split('(')[1]
-                        temp_stack = temp_stack.split(')')[0]
-                        temp_direction = 'W'
-                    elif (line_direction.split('(')[0] == 'READ'):
-                        temp_stack = line_direction.split('(')[1]
-                        temp_stack = temp_stack.split(')')[0]
-                        temp_direction = 'Read'
-                    elif (line_direction == 'PRINT'):
-                        temp_direction = 'Print'
-                    else:
-                        temp_direction = 'R'
+
+                if (first_new_line[2] == 'RIGHT'):
+                    temp_direction = 'R'
+                    new_line = first_new_line[3:]
+                elif (first_new_line[2] == 'LEFT'):
+                    temp_direction = 'L'
+                    new_line = first_new_line[3:]
+                elif(line_direction.split('(')[0] == 'RIGHT'):
+                    temp_tape = line_direction.split('(')[1]
+                    temp_tape = temp_tape.split(')')[0]
+                    temp_direction = 'R'
+                elif(line_direction.split('(')[0] == 'LEFT'):
+                    temp_tape = line_direction.split('(')[1]
+                    temp_tape = temp_tape.split(')')[0]
+                    temp_direction = 'L'
+                elif (line_direction.split('(')[0] == 'WRITE'):
+                    temp_stack = line_direction.split('(')[1]
+                    temp_stack = temp_stack.split(')')[0]
+                    temp_direction = 'W'
+                elif (line_direction.split('(')[0] == 'READ'):
+                    temp_stack = line_direction.split('(')[1]
+                    temp_stack = temp_stack.split(')')[0]
+                    temp_direction = 'Read'
+                elif (line_direction == 'PRINT'):
+                    temp_direction = 'Print'
                 else:
-                    temp_direction = line_direction[0]
+                    temp_direction = 'R'
 
                 stripped_list = map(str.strip, new_line)
                 line = ' '.join(stripped_list)
@@ -591,7 +645,8 @@ class AMI:
                     temp_symbols = temp_symbols.split('/')
                     symbols = tuple(temp_symbols[0])
                     if(len(temp_symbols) > 1):
-                        temp_moves = [temp_symbols[1], temp_direction]
+                        final_direction = temp_direction + '_' + temp_tape
+                        temp_moves = [temp_symbols[1], final_direction]
                     elif(temp_direction == 'W'):
                         symbols = tuple('`')
                         final_direction = temp_direction + '_' + temp_stack
@@ -604,7 +659,8 @@ class AMI:
                         symbols = tuple('#')
                         temp_moves = [temp_symbols[0], temp_direction]
                     else:
-                        temp_moves = [temp_symbols[0], temp_direction]
+                        final_direction = temp_direction + '_' + name_tape[0]
+                        temp_moves = [temp_symbols[0], final_direction]
                     stripped_list = map(str.strip, temp_moves)
                     temp_moves = ' '.join(stripped_list)
                     temp_moves = [temp_moves]
@@ -763,7 +819,7 @@ def display_steps():
 
 
 def reset():
-    global turn_num, output_gui, output_head_list, curr_head, branch_counter,branch_num, is_last_branch, final_state, accepted_branch_num, print_stack, curr_print_stack, stack_1, number_of_stacks, turn_num_stack
+    global turn_num, output_gui, output_head_list, curr_head, branch_counter,branch_num, is_last_branch, final_state, accepted_branch_num, print_stack, curr_print_stack, stack_1, number_of_stacks, turn_num_stack, number_of_tapes
     turn_num = 0
     branch_counter = 0
     branch_num = 0
@@ -785,6 +841,7 @@ def reset():
     stack_1 = []
     number_of_stacks = 0
     turn_num_stack = 0
+    number_of_tapes = 0
 
     instructions_text.config(text="INSTRUCTIONS\n\n"
                                       "<Compute> - Computes your designated input with the machine file you submitted\n"
