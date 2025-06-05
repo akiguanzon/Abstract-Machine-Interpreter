@@ -1,0 +1,10 @@
+.DATA
+
+TAPE T1
+TAPE T2
+
+.LOGIC
+A] RIGHT(T1) (1/X,B), (#/#,accept)
+B] RIGHT(T2) (#/1,C)
+C] RIGHT(T2) (#/1,D)
+D] RIGHT(T2) (#/1,A)

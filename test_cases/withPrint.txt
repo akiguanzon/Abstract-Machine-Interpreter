@@ -1,0 +1,3 @@
+.LOGIC
+q0] SCAN (0,q1), (#,accept)
+q1] PRINT (X,q0)

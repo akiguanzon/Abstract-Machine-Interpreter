@@ -1,0 +1,4 @@
+.LOGIC
+A] SCAN RIGHT (0,A), (1,B), (#,accept)
+B] SCAN LEFT (0,C), (1,reject)
+C] SCAN RIGHT (1,A)

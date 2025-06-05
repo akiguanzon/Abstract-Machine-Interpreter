@@ -1,0 +1,9 @@
+.DATA
+STACK S1
+.LOGIC
+A] WRITE(S1) (#,B)
+B] SCAN (0,C), (1,D)
+C] WRITE(S1) (#,B)
+D] READ(S1) (#,E)
+E] SCAN (1,D), (#,F)
+F] READ(S1) (#,accept)

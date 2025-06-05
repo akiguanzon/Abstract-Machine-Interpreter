@@ -1,0 +1,5 @@
+.LOGIC
+q0] SCAN (a,q1)
+q1] SCAN (a,q0), (a,q1), (b,q2)
+q2] SCAN (b,q2), (b,q1), (a,q1), (a,q3)
+q3] SCAN (a,q3), (b,q2), (#,accept)
